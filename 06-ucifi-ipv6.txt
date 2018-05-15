@@ -1,0 +1,237 @@
+####### IPv6
+
+This is the basic IPv6 protocol as specified in RFC 2460.  This does
+not include DHCPv6 or neighbor discovery.
+
+The IPv6 layer interacts with the lower layers via the HCI bus.
+Typically, a network interface driver performs the necessary
+HCI communication.
+
+##### Interface
+
+In the end device's IPv6 layer, each registered mesh network
+corresponds to a static IPv6 route and a unique virtual link layer
+interface.  The IPv6 layer attaches the following extra information to
+each interface:
+
+    1. Network ID
+    2. List of gateway address pairs:
+        a. Gateway EUI
+        b. IPv6 address acquired from gateway
+
+Recall that each gateway administers its own network within the mesh.
+When an end device registers with a gateway, the gateway assigns an
+IPv6 address from its network to the end device.  Thus, an end device has
+one IPv6 address for each gateway it is registered with.
+
+##### Source address
+
+When constructing an IPv6 packet, an end device must take care to
+select an appropriate source address.  Specifically, the end device
+should use the address corresponding to the gateway that will be
+routing the packet.  This ensures route symmetry among
+request-response-pairs, minimizing the risk of asymmetric packet loss.
+
+The host does this by keeping its interfaces' address lists in
+sync with the controller's gateway lists.  That is, the host remembers
+which address it got from which gateway, and when the controller
+indicates that a route's primary gateway has changed, the host adjusts
+the interface's primary address accordingly.  As long as an interface's
+primary address was assigned by the corresponding network's primary
+gateway, the correct source address will be used.
+
+##### Transmission
+
+When the host transmits an IPv6 packet, it first performs a route
+lookup using the destination IPv6 address as input.  If the lookup
+yields a route, the host constructs an IPv6 packet using the
+interface's primary address as the source address and delivers the
+packet to the interface for transmission.
+
+A link layer interface uses the following procedure to transmit a
+packet:
+
+1. Transmit `route-lookup` HCI command (Network-ID=n)
+2. Receive `response` HCI command (Gateway-EUI=XX)
+3. Transmit HCI data packet (Remote-EUI=XX, payload=ipv6-packet)
+
+##### Examples
+
+The following examples will use the following mesh setup.
+
+                    ,~~WAN~~,  
+                   (         ) 
+            .---[G1]          )
+           /      (   nID=0   )
+        [@]       (   ::/0    )
+         | \      (           )
+         |  `---[G2]         )       ,~~~~WAN~~~~, 
+         |          `~~~~~~~'       (             )
+          `----------------------[G3]    nID=91   )
+                                    (  9949::/16  )
+                                     `~~~~~~~~~~~' 
+
+In this setup, our end device `[@]` is connected to two WAN networks
+via three gateways.  The below table describes the two WAN networks:
+
+    NETWORK ID  | DESTINATION       | GATEWAYS      |
+    ============+===================+===============+
+    0           | ::/0              | [G1], [G2]    |
+    ------------+-------------------+---------------+
+    91          | 9949::/16         | [G3]          |
+    ------------+-------------------+---------------+
+
+The below table provides some additional information about the four
+mesh devices:
+
+    NAME        | IPV6 PREFIX       | EUI                       |
+    ============+===================+===========================+
+    [@]         | N/A               | 56:56:56:56:56:56:56:56   |
+    ------------+-------------------+---------------------------+
+    [G1]        | aaaa:a:a:a        | 11:11:11:11:11:11:11:11   |
+    ------------+-------------------+---------------------------+
+    [G2]        | bbbb:b:b:b        | 22:22:22:22:22:22:22:22   |
+    ------------+-------------------+---------------------------+
+    [G3]        | cccc:c:c:c        | 33:33:33:33:33:33:33:33   |
+    ------------+-------------------+---------------------------+
+
+Given this state, the end device would have the following static
+entries in its IPv6 routing table:
+
+    [ROUTING TABLE]
+        DESTINATION | NETIF     |
+        ============+===========+
+        9949::/16   | ucifi1    |
+        ------------+-----------+
+        ::/0        | ucifi0    |
+        ------------+-----------+
+
+Assuming that `[G1]` is the primary gateway for network 0, the end
+device's interface list might look like this:
+
+    [INTERFACE LIST]
+        INTERFACE: ucifi0
+            NETWORK-ID: 0
+            ADDRESSES:
+                aaaa:a:a:a:5456:5656:5656:5656
+                bbbb:b:b:b:5456:5656:5656:5656
+            GATEWAY-ADDRESS-PAIRS:
+                11:11:11:11:11:11:11:11, aaaa:a:a:a:5456:5656:5656:5656
+                22:22:22:22:22:22:22:22, bbbb:b:b:b:5456:5656:5656:5656
+
+        INTERFACE: ucifi1
+            NETWORK-ID: 91
+            ADDRESSES:
+                cccc:c:c:c:5456:5656:5656:5656
+            GATEWAY-ADDRESS-PAIRS:
+                33:33:33:33:33:33:33:33, cccc:c:c:c:5456:5656:5656:5656
+
+### Example 1: Transmit
+
+The host wants to send an IPv6 packet to address
+2513:3:a7:1555:53:60ff:fe01:d01b.
+
+Step 1: Route lookup
+
+The host performs a route lookup using the destination address as
+input.  This lookup yields the default route, ::/0.  This route is
+associated with interface `ucifi0`.
+
+Step 2: IPv6 packet construction
+
+The host constructs an IPv6 packet using `ucifi0`'s primary address as
+the source address: aaaa:a:a:a:5456:5656:5656:5656.
+
+Step 3: HCI data packet
+
+The host sends an HCI data packet to the controller.  The packet is
+filled with the following values:
+
+    | FIELD         | VALUE                     | NOTES               |
+    +===============+===========================+=====================+
+    | Proto         | 1                         | IPv6.               |
+    +---------------+---------------------------+---------------------+
+    | Prio          | 3                         | Default priority.   |
+    +---------------+---------------------------+---------------------+
+    | Length        | Size of IPv6 packet       | Including the IPv6  |
+    |               |                           | header.             |
+    +---------------+---------------------------+---------------------+
+    | Remote EUI    | aa:aa:aa:aa:aa:aa:aa:aa   | Primary gateway for |
+    |               |                           | network 0.          |
+    +---------------+---------------------------+---------------------+
+    | Payload       | Full IPv6 packet          |                     |
+    +---------------+---------------------------+---------------------+
+
+### Example 2: Changed primary gateway
+
+The controller sends a `set-primary-gateway` HCI command with the
+following arguments to the host:
+
+    | FIELD         | VALUE                                              |
+    +===============+====================================================+
+    | Gateway EUI   | 22:22:22:22:22:22:22:22                            |
+    +---------------+----------------------------------------------------+
+    | Network ID    | 0                                                  |
+    +---------------+----------------------------------------------------+
+        
+That is, the primary and secondary gateways for network 0 have swapped.
+As a result of this command, the host rearranges its `ucifi0` address
+list as follows:
+
+    INTERFACE: ucifi0
+        NETWORK-ID: 0
+        ADDRESSES:
+            bbbb:b:b:b:5456:5656:5656:5656
+            aaaa:a:a:a:5456:5656:5656:5656
+        GATEWAY-ADDRESS-PAIRS:
+            11:11:11:11:11:11:11:11, aaaa:a:a:a:5456:5656:5656:5656
+            22:22:22:22:22:22:22:22, bbbb:b:b:b:5456:5656:5656:5656
+
+### Example 3: Dropped network
+
+The end device loses its link to the `[G1]` gateway.  As a result, the
+controller sends a `delete-gateway` HCI command with the following
+arguments to the host:
+
+    | FIELD         | VALUE                                              |
+    +===============+====================================================+
+    | Gateway EUI   | 11:11:11:11:11:11:11:11                            |
+    +---------------+----------------------------------------------------+
+
+Upon receiving this command, the host deletes the `[G1]` gateway and
+its corresponding IPv6 address from all its interfaces, resulting in
+the following interface list:
+
+    [INTERFACE LIST]
+        INTERFACE: ucifi0
+            NETWORK-ID: 0
+            ADDRESSES:
+                bbbb:b:b:b:5456:5656:5656:5656
+            GATEWAY-ADDRESS-PAIRS:
+                22:22:22:22:22:22:22:22, bbbb:b:b:b:5456:5656:5656:5656
+
+        INTERFACE: ucifi1
+            NETWORK-ID: 91
+            ADDRESSES:
+                cccc:c:c:c:5456:5656:5656:5656
+            GATEWAY-ADDRESS-PAIRS:
+                33:33:33:33:33:33:33:33, cccc:c:c:c:5456:5656:5656:5656
+
+Later, the end devices also loses its link to the `[G2]` gateway.
+After the host deletes this gatway from its interface list, the
+`ucifi0` interface is left without any gateways.  As a result, the host
+deletes the `ucifi0` interface and all corresponding routes:
+
+    [ROUTING TABLE]
+        DESTINATION | NETIF     |
+        ============+===========+
+        9949::/16   | ucifi1    |
+        ------------+-----------+
+
+    [INTERFACE LIST]
+        INTERFACE: ucifi1
+            NETWORK-ID: 91
+            ADDRESSES:
+                cccc:c:c:c:5456:5656:5656:5656
+            GATEWAY-ADDRESS-PAIRS:
+                33:33:33:33:33:33:33:33, cccc:c:c:c:5456:5656:5656:5656

@@ -1,0 +1,203 @@
+######### Mesh Routing Protocol (MRP)
+
+The mesh routing protocol (MRP) is implemented on top of the MHF.  An
+MRP packet has a simple one-byte header:
+
+     0
+     0 1 2 3 4 5 6 7
+    +-+-+-+-+-+-+-+-+
+    |     Type      |
+    +-+-+-+-+-+-+-+-+
+
+The `Type` field indicates the structure of the message payload.
+
+####### MRP Message Types
+
+##### Routing Advertisement (RTA): Type=0x01
+
+A mesh node periodically broadcasts routing advertisements (RTAs) to
+its neighbors.  The mechanism by which these broadcasts are
+transmitted is TBD.
+
+The RTA payload consists entirely of TLVs with the following format:
+
+     0                   1
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |     Type      |    Length     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .                               .
+    .             Value             .
+    .                               .
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+### RTA TLV - Route
+
+The `Route` RTA TLV has the following structure:
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                          Gateway EUI                          |
+    |                                                               |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |              Cost             |  Network ID   |   Hop Count   |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |   Max Hops    |
+    +-+-+-+-+-+-+-+-+
+
+# Route Fields
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Gateway EUI   | The EUI of the gateway routing to the network.    |
++---------------+---------------------------------------------------+
+| Cost          | The cost of the advertised route.                 |
++---------------+---------------------------------------------------+
+| Network ID    | The ID of the destination network.                |
++---------------+---------------------------------------------------+
+| Hop Count     | The hop count of the advertised route.            |
++---------------+---------------------------------------------------+
+| Max Hops      | The maximum number of hops the route can          |
+|               | traverse.                                         |
++---------------+---------------------------------------------------+
+
+If the receiving node chooses to accept the RTA, it adds or replaces an
+entry in its upstream routing table with the following values:
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Destination   | `Gateway EUI` from routing advertisement.         |
++---------------+---------------------------------------------------+
+| Neighbor      | Sender of the routing advertisement.              |
++---------------+---------------------------------------------------+
+| Cost          | `Cost` from routing advertisement, plus the cost  |
+|               | to reach the sender.                              |
++---------------+---------------------------------------------------+
+| Hop count     | `Hop count` from routing advertisement plus one.  |
++---------------+---------------------------------------------------+
+| Max Hops      | Equal to the `Max Hops` field in the TLV.         |
++---------------+---------------------------------------------------+
+
+The receiving node also adds or replaces an entry in its network
+resolution table corresponding to the received RTA.
+
+A node shall never advertise a route whose `Hop Count` field is equal
+to its `Max Hops` field.
+
+##### Network Registration (REG): Type=0x02
+
+When a node learns a route to a new network, e.g., upon receiving an
+RTA, it must register with the gateway to join the network.  Network
+registration serves several purposes:
+
+    * Tests the route to the gateway
+    * Provides the gateway with a route back to the registering device.
+    * Requests an IPv6 address from the network.
+    * Provides security material to WAN servers.
+
+A REG message has the following structure:
+
+     0
+     0 1 2 3 4 5 6 7
+    +-+-+-+-+-+-+-+-+
+    |      Seq      |
+    +-+-+-+-+-+-+-+-+
+
+The `Seq` field is used to match a REG message with the acknowledgment
+that it elicits.
+
+Optionally, TLVs immediately follow the `Seq` field.  Each TLV has the
+following structure:
+
+     0                   1
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |     Type      |    Length     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .                               .
+    .             Value             .
+    .                               .
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+A REG packet's `T` (Trace) bit must be set in the MHF header.  This
+allows a receiving gateway to reconstruct a source route back to the
+registering device.  A REG packet whose `T` flag is not set shall be
+silently discarded.
+
+Upon receiving a REG, a gateway responds with a RACK (described
+below).
+
+### REG TLV - Network ID (Type=0x01)
+
+The `Network ID` REG TLV has the following structure:
+
+     0
+     0 1 2 3 4 5 6 7
+    +-+-+-+-+-+-+-+-+
+    |  Network ID   |
+    +-+-+-+-+-+-+-+-+
+
+This TLV indicates the network being registered for.  If the sender is
+registering for multiple networks, then it appends several TLVs of this
+type.
+
+##### Network Registration Ack (RACK): Type=0x03
+
+A RACK message has the following structure:
+
+     0
+     0 1 2 3 4 5 6 7
+    +-+-+-+-+-+-+-+-+
+    |      Seq      |
+    +-+-+-+-+-+-+-+-+
+
+The `Seq` field allows the receiving end device to match the RACK with
+its corresponding REG.
+
+Optionally, TLVs immediately follow the `Seq` field.  Each TLV has the
+following structure:
+
+     0                   1
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |     Type      |    Length     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .                               .
+    .             Value             .
+    .                               .
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+A RACK message shall contain exactly one `Join Status` TLV for each
+`Network ID` TLV in the corresponding REG.
+
+A RACK message with at least one successful `Join Status` TLV shall
+contain exactly one `IPv6 Prefix` TLV.
+
+### RACK TLV - Join Status (Type=0x01)
+
+The `Join Status` RACK TLV has the following structure:
+
+     0                   1
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |  Network ID   |    Status     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+This TLV indicates whether the specified network was successfully
+joined.  A `Status` code indicates success; nonzero indicates failure
+(codes TBD).
+
+### RACK TLV - IPv6 Prefix (Type=0x02)
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                            Prefix                             |
+    |                                                               |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+A gateway includes this TLV type in a RACK message to assign an
+IPv6 address to a joining end device.  The `Prefix` field contains the
+64-bit IPv6 prefix that the joining device uses to construct its new
+address.

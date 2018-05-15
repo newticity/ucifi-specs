@@ -1,0 +1,20 @@
+####### TBD
+
+The following functionality is likely required for a complete uCIFI
+implementation.  These areas require some discussion and design work.
+
+### MAC layer
+
+### MLME
+
+# Packet formats
+# API exposed to the upper layers
+
+### Device provisioning
+
+### Synchronized network time
+
+Devices will likely need a common sense of time.  What is the process
+by which all clocks in the mesh remain synchronized?
+
+### DDNS

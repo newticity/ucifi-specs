@@ -1,0 +1,168 @@
+####### MHF Routing
+
+The MHF layer is responsible for the routing of packets between nodes
+in the same mesh network.  As the MAC layer is only capable of
+transmitting to immediate neighbors, a higher level mechanism is needed
+for multi-hop mesh communication.  Routing at the MHF layer achieves
+this requirement.
+
+MHF packets are typically routed in two directions: upstream and
+downstream.  Upstream packets are sent from an end device up to a
+gateway, where they are possibly routed into the WAN.  Downstream
+packets are the reverse; from gateway to end device.  MHF communication
+between two end devices is possible, but atypical.
+
+### Upstream routing
+
+An end device routes its packets upstream using a simple
+distance-vector mechanism.  An upstream route is represented by an
+entry in the MHF upstream routing table with the following fields:
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Destination   | EUI of L2 destination (typically a gateway).      |
++---------------+---------------------------------------------------+
+| Neighbor      | EUI of neighbor to route through.                 |
++---------------+---------------------------------------------------+
+| Cost          | Measure of route reliability; smaller is better.  |
++---------------+---------------------------------------------------+
+| Hop count     | Number of hops to destination.                    |
++---------------+---------------------------------------------------+
+
+Example: 
+
+        [GW1]
+          |
+         [A]
+          |
+         [@]-------[GW2]
+            \     /
+             \   /
+              [B]
+
+In this example, we will look at things from the [@] device's
+perspective.  The bracketed letters are other end devices in the
+network, while the `[GW#]` entries represent gateways.
+
+We have three MAC-layer neighbors:
+    * [A]
+    * [B]
+    * [GW2]
+
+Our MHF routing table might look like this:
+
+| DESTINATION   | NEIGHBOR  | COST  | HOP-COUNT |
++===============+===========+=======+===========+
+| [GW1]         | [A]       | 100   | 2         |
++---------------+-----------+-------+-----------+
+| [GW2]         | [GW2]     | 80    | 1         |
++---------------+-----------+-------+-----------+
+| [GW2]         | [B]       | 130   | 2         |
++---------------+-----------+-------+-----------+
+
+When an end device transmits a MHF packet upstream, it performs a route
+lookup using the destination node's EUI as input.  The goal of the
+route lookup is to determine which neighbor to route through.  This
+information is contained in the `Neighbor` field of a routing table
+entry.
+
+Returning to our example, suppose `[@]` wants to transmit to `[GW1]`.
+It performs a route lookup using `[GW1]`'s EUI as input, yielding the
+first row in the table.  The MHF completes the packet transmission by
+handing the packet down to the MHF, and specifying `[GW1]` as the MHF
+destination and `[A]` as the MAC destination.
+
+If a route lookup yields more than one entry, the MHF chooses a
+preferred entry in an implementation-specific manner (likely via a cost
+comparison).  If `[@]` wants to transmit to `[GW2]`, the route lookup
+will match both of the bottom rows.  The MHF will likely transmit
+directly to `[GW2]`, since that route has a lower cost.
+
+If a route lookup yields no matches, the MHF can still try to transmit
+the packet under the assumption that the destination is a MAC-layer
+neighbor.  If `[@]` wants to transmit to `[A]`, the route lookup won't
+yield any results.  The MHF attempts to send the packet anyway by
+specifying `[A]` as both the MHF and MAC destinations.
+
+### Downstream routing
+
+Since nodes typically do not maintain routes to downstream
+destinations, they cannot be expected to route downstream packets on a
+neighbor's behalf.  Instead, a downstream MHF packet is *source
+routed*.  That is, the packet's MHF header contains the full route that
+the packet must follow to reach its destination.
+
+A source route is represented by a set of entries in a routing table.
+An entry in this table has the following fields:
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Destination   | EUI of L2 destination.                            |
++---------------+---------------------------------------------------+
+| Prev. hop     | EUI of destination's neighbor.                    |
++---------------+---------------------------------------------------+
+| Hop count     | Number of hops to destination.                    |
++---------------+---------------------------------------------------+
+
+Example:
+
+        [1]
+       /
+    [@]--[2]--[3]--[5]
+                 \
+                  [4]
+
+If `[@]` has downstream routes to each of the nodes, its downstream
+routing table might look like this:
+
+| DESTINATION   | PREV-HOP  | HOP-COUNT |
++===============+===========+===========+
+| [1]           | N/A       | 1         |
++---------------+-----------+-----------+
+| [2]           | N/A       | 1         |
++---------------+-----------+-----------+
+| [3]           | [2]       | 2         |
++---------------+-----------+-----------+
+| [4]           | [3]       | 3         |
++---------------+-----------+-----------+
+| [5]           | [3]       | 3         |
++---------------+-----------+-----------+
+
+To send a packet to a downstream node, a device performs a sequence of
+route lookups.  Starting with the destination node, the gateway
+backtracks to the start of the route, using the last result's
+`Prev-Hop` value as input for the next lookup.  When an entry with a
+`Hop-Count` of 1 is found, the full route has been extracted from the
+table.
+
+If `[@]` wants to send a packet to `[4]`, it would perform a sequence
+of three route lookups:
+
+    1. Input: [4], Result: prev-hop=[3]
+    2. Input: [3], Result: prev-hop=[2]
+    3. Input: [2], Result: prev-hop=N/A
+
+Using the results of these lookups, the MHF would send the MHF packet
+with the following arguments:
+
+    Destination: [4]
+    Source route: [2], [3], [4]
+    MAC destination: [2]
+
+##### Network Resolution
+
+A node uses the *network resolution table* to determines which gateways
+route to which networks.  A network resolution table entry contains the
+following fields:
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Network ID    | The ID of the destination network.                |
++---------------+---------------------------------------------------+
+| Gateway EUI   | The EUI of the gateway routing to the network.    |
++---------------+---------------------------------------------------+
+
+When the host wants to send an IPv6 packet to a WAN destination, it
+needs to know which gateway it should use for the MHF destination.  The
+controller provides this information to the host by performing a lookup
+in the network resolution table.

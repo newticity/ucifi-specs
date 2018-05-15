@@ -1,0 +1,408 @@
+####### HCI
+
+The HCI layer facilitates communication between the host and
+controller.  Currently, only one HCI transport is defined: the RAM
+transport.  This transport is suitable for a host and controller
+running on the same microcontroller and sharing an address space.
+
+##### HCI Guarantees
+
+Mechanisms for flow control, reliability, and packet integrity are
+defined by each HCI transport.  The RAM transport provides none of
+these mechanisms.
+
+##### HCI Sync
+
+It is the host's responsibility to monitor the health of the HCI layer.
+The controller acknowledges every command it receives from the host.
+When the host receives the expected responses from the controller, the
+HCI layer is said to be "in sync."  If the host does not receive a
+response to one of its commands after a host-defined timeout, the HCI
+has suffered "sync loss," and is now "out of sync."
+
+When the host deems the HCI layer to be out of sync, it attempts a
+"resync."  The host resyncs the HCI layer by sending a `reset` command
+to the controller.  When the host receives an acknowledgement of its
+`reset` command, the HCI layer is once again in sync and the reset
+procedure is complete.  If a `reset` acknowledgement never arrives, the
+host sends another `reset` command, repeating the procedure until it
+receives an acknowledgement.
+
+##### Startup
+
+When the host starts up, it assumes the HCI layer is out of sync.  The
+host must resync the HCI layer before performing any further
+communication with the controller.
+
+##### HCI Packet Formats
+
+### Command packet
+
+HCI commands can be sent both from controller to host and from host to
+controller.  Unlike data packets, commands remain within the HCI layer;
+they are not passed to other layers and are not forwarded to remote
+devices.
+
+When the controller receives a command from the host, it always replies
+with a `response` command.
+
+Responses are only sent from controller to host.  The host does not
+acknowledge commands it receives from the controller.
+
+The HCI command packet structure is depicted below.
+
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |0|            Type             |             Length            |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   .                                                               .
+   .                            Payload                            .
+   .                                                               .
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Command packet fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| 0             | Always 0; designates the HCI packet as a command.  |
++---------------+----------------------------------------------------+
+| Type          | Indicates the command type.                        |
++---------------+----------------------------------------------------+
+| Length        | The length of the `Payload` field, in bytes.       |
++---------------+----------------------------------------------------+
+| Payload       | Type-specific content.                             |
++---------------+----------------------------------------------------+
+
+### Data packet
+
+HCI data packets represent MHF packets sent between two mesh devices.
+Data packets can be sent both from controller to host and from host to
+controller.
+
+The host sends a data packet to the controller when it wishes to
+transmit to a remote mesh device.
+
+The controller sends a data packet to the host when MHF data is
+received from a remote mesh device.
+
+The data packet structure is depicted below.
+
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |1| Proto |Prio |       0       |             Length            |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                            Remote                             |
+   |                              EUI                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   .                                                               .
+   .                            Payload                            .
+   .                                                               .
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Data packet fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| 1             | Always 1; designates the HCI packet as data.       |
++---------------+----------------------------------------------------+
+| Proto         | The numeric identifier of the upper layer protocol |
+|               | (e.g., 1 indicates IPv6).                          |
++---------------+----------------------------------------------------+
+| Prio          | Host-to-controller: Packet priority.               |
+|               | Controller-to-host: Always 0.                      |
++---------------+----------------------------------------------------+
+| 0             | Reserved; always 0.                                |
++---------------+----------------------------------------------------+
+| Length        | The length of the `Payload` field, in bytes.       |
++---------------+----------------------------------------------------+
+| Remote EUI    | Host-to-controller: MHF destination.               |
+|               | Controller-to-host: MHF source.                    |
++---------------+----------------------------------------------------+
+| Payload       | The MHF packet payload.                            |
++---------------+----------------------------------------------------+
+
+##### Host-to-controller commands
+
+### RESET (0x0001)
+
+# Command payload
+
+    0                   1
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |              Reason             |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Response payload: None
+
+# Command description
+
+The host sends a reset command to the controller when it needs to
+perform a full stack reset.  This command is sent on startup and as
+part of the resync procedure.
+
+# Command fields
+
+| FIELD     | DESCRIPTION                                            |
++===========+========================================================+
+| Reason    | A code indicating the reason for the reset.  All codes |
+|           | are currently TBD.                                     |
++-----------+--------------------------------------------------------+
+
+### EUI-GET (0x0002)
+
+# Command payload: None
+
+# Response payload:
+
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             Local                             |
+   |                              EUI                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Command description
+
+The host sends a eui-get command to the controller when it needs to
+know its own EUI.  This command is typically sent on startup.
+
+# Response fields
+
+| FIELD     | DESCRIPTION                                            |
++===========+========================================================+
+| Local EUI | The EUI of the local device.                           |
++-----------+--------------------------------------------------------+
+
+### EUI-SET (0x0003)
+
+# Command payload: None
+
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                             Local                             |
+   |                              EUI                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Response payload: None
+
+# Command description
+
+The host sends a eui-set command to the controller when it wants to
+configure its own EUI.  This command is typically sent on startup.
+
+# Command fields
+
+| FIELD     | DESCRIPTION                                            |
++===========+========================================================+
+| Local EUI | The EUI that the controller should use.                |
++-----------+--------------------------------------------------------+
+
+### ROUTE-LOOKUP (0x0004)
+
+# Command payload
+
+    0
+    0 1 2 3 4 5 6 7
+   +-+-+-+-+-+-+-+-+
+   |  Network ID   |
+   +-+-+-+-+-+-+-+-+
+
+# Response payload:
+
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |                            Gateway                            |
+   |                              EUI                              |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Command description
+
+The host sends a route-lookup command to the controller to determine
+the primary gateway associated with a particular network.  The host
+requires the gateway EUI for populating the `Remote EUI` field in
+outgoing data packets.
+
+# Command fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| Network ID    | The ID of the network to find a route to.          |
++---------------+----------------------------------------------------+
+
+# Response fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| Gateway EUI   | The EUI of the preferred gateway for the requested |
+|               | network.                                           |
++---------------+----------------------------------------------------+
+
+##### Controller-to-host commands
+
+### RESPONSE (0x4001)
+
+# Command payload
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |0|        Request type         |       0       |    Status     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .                                                               .
+    .                       Response payload                        .
+    .                                                               .
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Command description
+
+The controller sends a response when it receives a command from the
+host.
+
+A response command can be categorized according to its `Status` field.
+If the `Status` field indicates success (0), the response is known as
+an "ack".  If the `Status` field is nonzero, the response is a "nack".
+
+The semantics of an ack depends on the type of command being acked.
+For some command types, the controller only sends an ack after the
+command has been fully processed.  For other command types, the
+controller sends an ack immediately upon receiving the command.  For
+this second class of commands, the result of processing the command may
+be communicated by a separate controller-to-host command sometime
+later.
+
+A nack indicates an error during parsing or processing of the command.  
+
+Unless otherwise specified, a nack's `Response payload` field is always
+empty.
+
+# Command fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| 0             | Reserved; always 0.                                |
++---------------+----------------------------------------------------+
+| Request type  | The type of command that elicited the response.    |
++---------------+----------------------------------------------------+
+| Status        | 0 if the command has been successfully received or |
+|               | fully processed, depending on the command type.    |
+|               |                                                    |
+|               | Nonzero if the controller failed to parse or       |
+|               | process the command.                               |
++---------------+----------------------------------------------------+
+| Response      | Additional response data specific to the           |
+| payload       | acknowledged command.                              |
++---------------+----------------------------------------------------+
+
+### REGISTRATION-COMPLETE (0x4002)
+
+# Command payload
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                            Gateway                            |
+    |                              EUI                              |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                            Network                            |
+    |                          IPv6 prefix                          |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |  Network ID   |
+    +-+-+-+-+-+-+-+-+
+
+# Command description
+
+The controller sends a `registration-complete` command to the host when
+it has successfully completed a network registration procedure.  Upon
+receiving this command, the host must do all of the following:
+
+1. Create a network interface corresponding to the indicated network
+   ID, if one does not already exist.
+
+2. Add an IPv6 address to the interface from step 1.  The IPv6 address
+   is formed from the indicated IPv6 prefix and the controller's EUI.
+   If the interface is already configured with this address, this step
+   is skipped.
+
+3. Associate the indicated gateway EUI with the address from step 2.
+   This mapping is necessary for determining the correct source address
+   to use in outgoing data packets.
+
+# Command fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| Gateway EUI   | The EUI of the gateway that was registered with.   |
++---------------+----------------------------------------------------+
+| Network IPv6  | The prefix of the IPv6 address assigned to the     |
+| prefix        | local device by the gateway.                       |
++---------------+----------------------------------------------------+
+| Network ID    | The ID of the affected network.                    |
++---------------+----------------------------------------------------+
+
+### SET-PRIMARY-GATEWAY (0x4003)
+
+# Command payload
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                            Gateway                            |
+    |                              EUI                              |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |  Network ID   | 
+    +-+-+-+-+-+-+-+-+
+
+# Command description
+
+The controller sends a `set-primary-gateway` command to the host when
+the preferred gateway for a network has changed.
+
+The host needs this information from the controller in order to send
+data to the indicated network.  When sending data, the host needs to
+know 1) which remote EUI to fill the HCI data packet with, and 2) which
+source IPv6 address to use.
+
+# Command fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| Gateway EUI   | The EUI of the primary gateway.                    |
++---------------+----------------------------------------------------+
+| Network ID    | The ID of the affected network.                    |
++---------------+----------------------------------------------------+
+
+### DELETE-GATEWAY (0x4004)
+
+# Command payload
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                            Gateway                            |
+    |                              EUI                              |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |  Network ID   | 
+    +-+-+-+-+-+-+-+-+
+
+# Command description
+
+The controller sends a `delete-gateway` command to the host when it
+leaves the gateway's network.  Common reasons why a controller might
+send this command are 1) loss of connectivity to the gateway, and 2)
+reception of a registration nack message from the gateway. Upon
+receiving this command, the host removes the gateway and its
+corresponding IPv6 address from the interface corresponding to the
+specified network ID.  If this operation deletes the last gateway from
+an interface, the host also deletes the corresponding interface.
+
+# Command fields
+
+| FIELD         | DESCRIPTION                                        |
++===============+====================================================+
+| Gateway EUI   | The EUI of the deleted gateway.                    |
++---------------+----------------------------------------------------+

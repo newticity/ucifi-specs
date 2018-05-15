@@ -1,0 +1,203 @@
+####### REVISION HISTORY
+
+
+| Version | Date       | Description                                 |
+|---------+------------+---------------------------------------------|
+| 0.1     | 2018-05-15 | Initial document.                           |
+
+####### INTRODUCTION
+
+
+uCIFI is a wireless mesh protocol that allows devices running Apache
+Mynewt embedded operating system to communicate with each other and
+with central management software.  This document proposes a design and
+some implementation details of the uCIFI embedded software.
+
+As this is a working document, some sections are incomplete or missing,
+and some proposed data structures are sparse.  The expectation is that
+details will be filled in as the design matures.
+
+
+####### ARCHITECTURE
+
+
+This section illustrates the uCIFI network architecture at a high
+level.  The diagram below depicts a hypothetical uCIFI mesh.
+
+                    ,--------------.
+                   /                \
+                  |        WAN       |
+                   \                /
+                    `--------------'
+                    /      |       \
+                   /       |        \
+                 [GW1]  [GW2]     [GW3]
+                /  |   /     \    /
+               /   |  /       \  /
+             [d1]--[d2]       [d3]
+               \   /
+               [d4]
+
+This miniature uCIFI network consists of three components:
+
+* WAN:
+    Contains machines running management software.  Not directly
+    connected to the mesh.
+
+* Gateways (GW):
+    Mesh devices capable of routing packets between the WAN and other
+    mesh nodes.
+
+* End devices (d): 
+    Mesh devices with no direct link to the WAN.
+
+Let's look at these components in more detail.
+
+### WAN
+
+The WAN (wide area network) is not strictly part of the mesh, but it is
+central to mesh operation.  Machines residing in the WAN perform
+configuration and management of mesh devices.  In addition, data
+collected by mesh end devices gets sent upstream to the WAN.  Finally,
+other services required for the mesh to function, such as DNS servers,
+operate from within the WAN.
+
+The WAN can be a private network or the Internet.  The above diagram
+depicts only a single WAN, but more complicated networks can involve
+several WANs.
+
+### Gateway
+
+Gateways route packets between the WAN and other end devices in the
+mesh.  A gateway's WAN link can be anything that provides IPv6
+connectivity, such as a cellular or ethernet connection.  Each gateway
+forms its own IPv6 network within the mesh, identified by a unique
+64-bit IPv6 prefix.  If an end device wants to use a gateway as a
+router, it must first join the gateway's network via a network
+registration procedure.  When an end device joins a gateway's network,
+the gateway assigns the device a new IPv6 address, formed by
+concatenating the network prefix and the end device's MAC EUI.
+
+Gateways route packets to downstream end devices using mesh-under
+source routes.  When a gateway sends a packet to an end device, it
+populates the packet with the precise hop-by-hop route that the packet
+must follow to reach its destination.  When an end device registers
+with a gateway, the gateway records a source route entry corresponding
+to the registering node.  Thus, a gateway's routing table contains an
+entry for each end device registered to its network.
+
+The network depicted above contains three gateways, all connected to
+the same WAN.  In other networks, gateways could serve as routers for
+multiple WANs.  A gateway indicates connectivity to a particular WAN by
+broadcasting routing advertisements.  Neighboring end devices determine
+which WAN(s) the gateway is a router from the contents of the
+advertisements.
+
+### End device
+
+End devices form the bulk of the mesh.  There may be thousands of end
+devices for each gateway.  An end device serves three basic roles in
+the mesh:
+
+1. Management server: The end device processes management commands sent
+from the WAN as IPv6 packets.
+
+2. Data source: The end device sends data it has collected upstream to
+the WAN as IPv6 packets.
+
+3. Packet forwarder: The end device acts as a layer 2 packet forwarder.
+It facilitates connectivity to the WAN by forwarding packets from nodes
+further downstream.
+
+An end device can route through multiple gateways.  In the above
+diagram, `d2` is connected to two gateways: `GW1` and `GW2`.  Since
+both of these gateways provide connectivity to the same WAN, `d2`
+maintains a connection to both purely for redundancy in case one of the
+links deteriorates or fails.  Since `d2` is registered to two networks,
+it has two IPv6 addresses, one received from each gateway.
+
+An end device sends or forwards packets up to the WAN using a simple
+mesh-under distance-vector routing algorithm.  That is, a node doesn't
+know the exact path a packet must follow to reach the WAN, but it knows
+which neighbors are capable of forwarding the packet to its
+destination.  The cost of a particular route is calculated from the
+cumulative link quality of each hop.
+
+End devices announce connectivity by broadcasting routing
+advertisements, exactly as gateways do.  In the above diagram, `d4`
+achieves connectivity via two upstream neighbors: `d1` and `d2`.  It is
+not depicted in the diagram, but let's assume `d4` has joined the
+networks of both connected gateways (`GW1` and `GW2`).  To arrive at
+this state, `d4` must have received routing advertisements from both
+its neighbors, and it must have responded by initiating network
+registration with both gateways.  Any time `d4` wishes to send a packet
+up to the WAN, it can choose from a variety of route:
+
+    a) GW1 via d1
+    b) GW1 via d2
+    c) GW2 via d2
+
+An end device decides which route to use for IP packets based on cost.
+When sending IP packets, an end device selects the source IPv6 address
+corresponding to the gateway that will be routing the packet.
+
+Given that the mesh network is inherently dynamic, an end device cannot
+be expected to maintain a consistent set of IP addresses.  As link
+qualities change and nodes are added and removed from the mesh, end
+devices may not stay registered to same set of gateways for long.
+Consequently, IP addresses do not provide an effective means of
+identifying an end device.  Instead, DNS provides a consistent means of
+addressing end devices.  When an end device's set of IP addresses
+changes, it sends a DDNS update to one or more DNS servers.
+
+
+####### NETWORK STACK
+
+    +-----------------+-----------------+  ---+
+    |       UDP       |       TCP       |     |
+    +-----------------+-----------------+     |
+    |               IPv6                |     +-- HOST
+    +-----------------------------------+     |
+    |             HOST-HCI              |     |
+    +-----------------+-----------------+  ---+
+                      |
+                      +--- HCI-TRANSPORT
+                      |
+    +-----------------+-----------------+  ---+
+    |             CTLR-HCI              |     |
+    +-----------------+-----------------+     |
+    |       MHF       |      MLME       |     |
+    +-----------------+-----------------+     +-- CONTROLLER
+    |                MAC                |     |
+    +-----------------------------------+     |
+    |                PHY                |     |
+    +-----------------------------------+  ---+
+
+The full uCIFI stack consists of two components: host and controller.
+These two components can run on the same microcontroller, or they can
+be physically separate.  In both cases, the host and controller
+communicate via the HCI bus.
+
+The layers of the uCIFI stack described below.
+
+| Layer | Description                                                |
++=======+============================================================+
+| UDP   | As specified.                                              |
++-------+------------------------------------------------------------+
+| TCP   | As specified.                                              |
++-------+------------------------------------------------------------+
+| IPv6  | As specified.                                              |
++-------+------------------------------------------------------------+
+| HCI   | Host-controller interface.  Allows the host and controller |
+|       | to communicate while running on physically separate        |
+|       | microcontrollers.                                          |
++-------+------------------------------------------------------------+
+| MHF   | Multi-hop forwarding.  Intramesh datagram-based protocol.  |
++-------+------------------------------------------------------------+
+| MLME  | MAC-layer management entity.  Maintains and exchanges      |
+|       | information with L2 neighbors.                             |
++-------+------------------------------------------------------------+
+| MAC   | 802.15.4-esque.                                            |
++-------+------------------------------------------------------------+
+| PHY   | 802.15.4-esque.                                            |
++-------+------------------------------------------------------------+

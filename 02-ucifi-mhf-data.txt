@@ -1,0 +1,138 @@
+##### Multi-hop Forwarding (MHF)
+
+MHF is a simple, unreliable, datagram protocol.  The MHF header is
+specified below.  All fields are in network byte order (i.e., lower
+numbered bits are more significant than higher numbered bits).
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |Ver|  0  |Prio |      TTL      | Proto |HopIdx | 0 |X|T|AddrCnt|
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .                                                               .
+    .                          [Addresses]                          .
+    .                                                               .
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    .                                                               .
+    .                            [TLVs]                             .
+    .                                                               .
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+### MHF header fields
+
+| FIELD     | DESCRIPTION                                            |
++===========+========================================================+
+| Ver       | MHF protocol version; currently 0.                     |
++-----------+--------------------------------------------------------+
+| 0         | Reserved; must be 0.                                   |
++-----------+--------------------------------------------------------+
+| Prio      | Packet priority.  Greater numbers correspond to        |
+|           | higher priority.  Higher priority packets should be    |
+|           | transmitted before lower priority packets.             |
++-----------+--------------------------------------------------------+
+| TTL       | Maximum hops the packet can travel before being        |
+|           | discarded.  This field is decremented each time the    |
+|           | packet is transmitted.  A packet with a TTL value of 0 |
+|           | shall never be transmitted.                            |
++-----------+--------------------------------------------------------+
+| Proto     | The numeric identifier of the upper layer protocol     |
+|           | (e.g., 1 indicates IPv6).                              |
++-----------+--------------------------------------------------------+
+| HopIdx    | Indicates the current hop number for source-routed     |
+|           | packets.                                               |
++-----------+--------------------------------------------------------+
+| X         | The eXtended flag.  If set, one or more TLV entries is |
+|           | located at the end of the header, immediately          |
+|           | following the address list (if any).                   |
++-----------+--------------------------------------------------------+
+| T         | The Trace flag.  If set, each node that forwards the   |
+|           | packet adds a "hop" TLV containing its own EUI.  This  |
+|           | is used during network registration.                   |
++-----------+--------------------------------------------------------+
+| AddrCnt   | Indicates the number of addresses at the end of the    |
+|           | header.                                                |
++-----------+--------------------------------------------------------+
+| Addresses | A contiguous list of `AddrCnt` 8-bit EUIs.  If         |
+|           | `AddrCnt` is 0, this field is not present.             |
++-----------+--------------------------------------------------------+
+| TLVs      | A sequence of Type-Length-Value (TLV) entries.  Only   |
+|           | present if the `X` bit is set.                         |
++-----------+--------------------------------------------------------+
+
+### MHF protocol identifiers
+
+     0: Reserved
+     1: IPv6
+2 - 15: Reserved
+
+### MHF TLV format 
+
+The `X` bit in the MHF header indicates the presence of MHF TLVs.  Each
+TLV has the following structure:
+
+    0                   1
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   |M|    Type     |    Length     |
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   .                               .
+   .            [Value]            .
+   .                               .
+   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+### MHF TLV fields
+
+| FIELD     | DESCRIPTION
++===========+========================================================+
+| M         | The More flag.  If set, another TLV follows this one.  |
++-----------+--------------------------------------------------------+
+| Type      | Indicates the type of data contained in this TLV.      |
++-----------+--------------------------------------------------------+
+| Length    | The length of the `Value` field, in bytes.             |
++-----------+--------------------------------------------------------+
+| Value     | Type-specific data.  Only present if `Length` is       |
+|           | greater than 0.                                        |
++-----------+--------------------------------------------------------+
+
+### MHF TLV types
+
+| VALUE     | NAME      | CONTENTS
++===========+===========+================================================+
+| 0         | Reserved  | N/A                                            |
++-----------+-----------+------------------------------------------------+
+| 1         | Hop       | Transmitter's EUI.                             |
++-----------+-----------+------------------------------------------------+
+| 2 - 127   | Reserved  | N/A                                            |
++-----------+-----------+------------------------------------------------+
+
+### MHF AddrCnt values
+
+There are three types of MHF packets, each identified by the value of
+the `AddrCnt` field:
+
+# Single-hop (`AddrCnt` = 0)
+
+The source and destination devices must be MAC-layer neighbors.  As an
+optimization, the endpoint addresses are elided from the MHF header
+since they are already present in the MAC header.  The `HopIdx` field
+is always 0 in this type of packet.
+
+# Multi-hop destination-routed (`AddrCnt` = 2):
+
+The source and destination devices are not MAC-layer neighbors, but
+the MHF header does not contain the route that the packet is expected
+to follow.  Instead, intermediate nodes forward the packet according
+to their MHF routing tables until it reaches its destination.  The MHF
+header contains two addresses: 1) the originator of the packet, and 2)
+the packet's intended destination.  The `HopIdx` field is always 0 in
+this type of packet.
+
+# Multi-hop source-routed (`AddrCnt` > 2):
+
+The source and destination devices are not MAC-layer neighbors.  The
+MHF header contains the full route that the packet must follow to reach
+its destination.  Each address in the header represents a single hop in
+the route, starting with the source device, and ending with the
+destination device.  Each node increments the `HopIdx` field
+immediately before forwarding the packet to the next hop, allowing
+subsequent nodes to know which hop comes next in the route.
