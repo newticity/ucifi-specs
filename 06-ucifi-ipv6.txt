@@ -44,16 +44,12 @@ gateway, the correct source address will be used.
 
 When the host transmits an IPv6 packet, it first performs a route
 lookup using the destination IPv6 address as input.  If the lookup
-yields a route, the host constructs an IPv6 packet using the
-interface's primary address as the source address and delivers the
-packet to the interface for transmission.
+yields a route, the host constructs an IPv6 packet as follows:
 
-A link layer interface uses the following procedure to transmit a
-packet:
+    * Source address: Network interface's primary address
+    * Destination address: Formed from gateway's IPv6 prefix and EUI.
 
-1. Transmit `route-lookup` HCI command (Network-ID=n)
-2. Receive `response` HCI command (Gateway-EUI=XX)
-3. Transmit HCI data packet (Remote-EUI=XX, payload=ipv6-packet)
+The host then delivers the packet to the interface for transmission.
 
 ##### Examples
 
