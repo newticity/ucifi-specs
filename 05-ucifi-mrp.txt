@@ -82,14 +82,42 @@ entry in its upstream routing table with the following values:
 The receiving node also adds or replaces an entry in its network
 resolution table corresponding to the received RTA.
 
-A node shall never advertise a route whose `Hop Count` field is equal
-to its `Max Hops` field.
+A node shall never advertise a route whose `Hop Count` field is greater
+than or equal to its `Max Hops` field.
+
+### RTA TLV - Poison
+
+Poisons are sent to indicate the loss of a route.  Upon receiving a
+poison TLV, an end device deletes all of its routes that use the
+specified gateway.
+
+The `Poison` RTA TLV has the following structure:
+
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                          Gateway EUI                          |
+    |                                                               |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |    Reason     |
+    +-+-+-+-+-+-+-+-+
+
+# Poison Fields
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Gateway EUI   | The EUI of the unstable gateway.                  |
++---------------+---------------------------------------------------+
+| Reason        | The reason the sender has deleted its routes to   |
+|               | the gateway.                                      |
++---------------+---------------------------------------------------+
+
 
 ##### Network Registration (REG): Type=0x02
 
 When a node learns a route to a new network, e.g., upon receiving an
-RTA, it must register with the gateway to join the network.  Network
-registration serves several purposes:
+RTA, it typically register with the gateway to join the network.
+Network registration serves several purposes:
 
     * Tests the route to the gateway
     * Provides the gateway with a route back to the registering device.
