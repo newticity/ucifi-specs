@@ -4,8 +4,8 @@ This is the basic IPv6 protocol as specified in RFC 2460.  This does
 not include DHCPv6 or neighbor discovery.
 
 The IPv6 layer interacts with the lower layers via the HCI bus.
-Typically, a network interface driver performs the necessary
-HCI communication.
+Typically, a network interface driver performs the necessary HCI
+communication.
 
 ##### Interface
 
@@ -21,8 +21,8 @@ each interface:
 
 Recall that each gateway administers its own network within the mesh.
 When an end device registers with a gateway, the gateway assigns an
-IPv6 address from its network to the end device.  Thus, an end device has
-one IPv6 address for each gateway it is registered with.
+IPv6 address from its network to the end device.  Thus, an end device
+has one IPv6 address for each gateway it is registered with.
 
 ##### Source address
 
@@ -32,11 +32,11 @@ should use the address corresponding to the gateway that will be
 routing the packet.  This ensures route symmetry among
 request-response-pairs, minimizing the risk of asymmetric packet loss.
 
-The host does this by keeping its interfaces' address lists in
-sync with the controller's gateway lists.  That is, the host remembers
-which address it got from which gateway, and when the controller
-indicates that a route's primary gateway has changed, the host adjusts
-the interface's primary address accordingly.  As long as an interface's
+The host does this by keeping its interfaces' address lists in sync
+with the controller's gateway lists.  That is, the host remembers which
+address it got from which gateway, and when the controller indicates
+that a route's primary gateway has changed, the host adjusts the
+interface's primary address accordingly.  As long as an interface's
 primary address was assigned by the corresponding network's primary
 gateway, the correct source address will be used.
 

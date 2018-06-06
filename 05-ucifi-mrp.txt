@@ -213,8 +213,8 @@ The `Join Status` RACK TLV has the following structure:
     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 This TLV indicates whether the specified network was successfully
-joined.  A `Status` code indicates success; nonzero indicates failure
-(codes TBD).
+joined.  A zero `Status` code indicates success; nonzero indicates
+failure (codes TBD).
 
 ### RACK TLV - IPv6 Prefix (Type=0x02)
 

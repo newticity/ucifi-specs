@@ -166,7 +166,7 @@ part of the resync procedure.
 
 # Command description
 
-The host sends a eui-get command to the controller when it needs to
+The host sends an eui-get command to the controller when it needs to
 know its own EUI.  This command is typically sent on startup.
 
 # Response fields

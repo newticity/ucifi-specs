@@ -9,7 +9,7 @@ this requirement.
 MHF packets are typically routed in two directions: upstream and
 downstream.  Upstream packets are sent from an end device up to a
 gateway, where they are possibly routed into the WAN.  Downstream
-packets are the reverse; from gateway to end device.  MHF communication
+packets are the reverse: from gateway to end device.  MHF communication
 between two end devices is possible, but atypical.
 
 ### Upstream routing
@@ -60,9 +60,9 @@ Our MHF routing table might look like this:
 | [GW2]         | [B]       | 130   | 2         |
 +---------------+-----------+-------+-----------+
 
-When an end device transmits a MHF packet upstream, it performs a route
-lookup using the destination node's EUI as input.  The goal of the
-route lookup is to determine which neighbor to route through.  This
+When an end device transmits an MHF packet upstream, it performs a
+route lookup using the destination node's EUI as input.  The goal of
+the route lookup is to determine which neighbor to route through.  This
 information is contained in the `Neighbor` field of a routing table
 entry.
 
@@ -160,6 +160,6 @@ following fields:
 +---------------+---------------------------------------------------+
 
 When the host wants to send an IPv6 packet to a WAN destination, it
-needs to know which gateway it should use for the MHF destination.  The
+needs to know which gateway it should use as the MHF destination.  The
 controller provides this information to the host by performing a lookup
 in the network resolution table.

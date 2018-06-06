@@ -61,15 +61,15 @@ several WANs.
 
 ### Gateway
 
-Gateways route packets between the WAN and other end devices in the
-mesh.  A gateway's WAN link can be anything that provides IPv6
-connectivity, such as a cellular or ethernet connection.  Each gateway
-forms its own IPv6 network within the mesh, identified by a unique
-64-bit IPv6 prefix.  If an end device wants to use a gateway as a
-router, it must first join the gateway's network via a network
-registration procedure.  When an end device joins a gateway's network,
-the gateway assigns the device a new IPv6 address, formed by
-concatenating the network prefix and the end device's MAC EUI.
+Gateways route packets between the WAN and end devices in the mesh.  A
+gateway's WAN link can be anything that provides IPv6 connectivity,
+such as a cellular or ethernet connection.  Each gateway forms its own
+IPv6 network within the mesh, identified by a unique 64-bit IPv6
+prefix.  If an end device wants to use a gateway as a router, it must
+first join the gateway's network via a network registration procedure.
+When an end device joins a gateway's network, the gateway assigns the
+device a new IPv6 address, formed by concatenating the network prefix
+and the end device's MAC EUI (as described in RFC 4291).
 
 Gateways route packets to downstream end devices using mesh-under
 source routes.  When a gateway sends a packet to an end device, it
@@ -83,7 +83,7 @@ The network depicted above contains three gateways, all connected to
 the same WAN.  In other networks, gateways could serve as routers for
 multiple WANs.  A gateway indicates connectivity to a particular WAN by
 broadcasting routing advertisements.  Neighboring end devices determine
-which WAN(s) the gateway is a router from the contents of the
+which WANs the gateway routes to from the contents of the
 advertisements.
 
 ### End device
@@ -105,9 +105,9 @@ further downstream.
 An end device can route through multiple gateways.  In the above
 diagram, `d2` is connected to two gateways: `GW1` and `GW2`.  Since
 both of these gateways provide connectivity to the same WAN, `d2`
-maintains a connection to both purely for redundancy in case one of the
-links deteriorates or fails.  Since `d2` is registered to two networks,
-it has two IPv6 addresses, one received from each gateway.
+maintains a connection to both, purely for redundancy in case one of
+the links deteriorates or fails.  Since `d2` is registered to two
+networks, it has two IPv6 addresses, one received from each gateway.
 
 An end device sends or forwards packets up to the WAN using a simple
 mesh-under distance-vector routing algorithm.  That is, a node doesn't
@@ -124,7 +124,7 @@ networks of both connected gateways (`GW1` and `GW2`).  To arrive at
 this state, `d4` must have received routing advertisements from both
 its neighbors, and it must have responded by initiating network
 registration with both gateways.  Any time `d4` wishes to send a packet
-up to the WAN, it can choose from a variety of route:
+up to the WAN, it can choose from a variety of routes:
 
     a) GW1 via d1
     b) GW1 via d2
@@ -171,7 +171,7 @@ These two components can run on the same microcontroller, or they can
 be physically separate.  In both cases, the host and controller
 communicate via the HCI bus.
 
-The layers of the uCIFI stack described below.
+The layers of the uCIFI stack are described below.
 
 | Layer | Description                                                |
 +=======+============================================================+
