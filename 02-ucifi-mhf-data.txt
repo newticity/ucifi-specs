@@ -60,7 +60,8 @@ specified below.
 
      0: Reserved
      1: IPv6
-2 - 15: Reserved
+     2: MRP
+3 - 15: Reserved
 
 ### MHF TLV format 
 
