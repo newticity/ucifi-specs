@@ -224,8 +224,25 @@ joined.  A `Status` code indicates success; nonzero indicates failure
     |                            Prefix                             |
     |                                                               |
     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                          Lease Time                           |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-A gateway includes this TLV type in a RACK message to assign an
-IPv6 address to a joining end device.  The `Prefix` field contains the
-64-bit IPv6 prefix that the joining device uses to construct its new
-address.
+A gateway includes the `IPv6 Prefix` TLV type in a RACK message to
+assign an IPv6 address to a joining end device.  The `Prefix` field
+contains the 64-bit IPv6 prefix that the joining device uses to
+construct its new address.
+
+# IPv6 Prefix Fields
+
+| FIELD         | DESCRIPTION                                       |
++===============+===================================================+
+| Prefix        | 64-bit IPv6 prefix that the joining device uses   |
+|               | to construct its new address.                     |
++---------------+---------------------------------------------------+
+| Lease Time    | The duration, in seconds, before the assigned     |
+|               | address expires.                                  |
++---------------+---------------------------------------------------+
+
+If an end device wishes to remain joined to the gateway, it must
+perform an additional registration procedure before the lease time has
+elapsed.
