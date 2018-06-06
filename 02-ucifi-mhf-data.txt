@@ -1,8 +1,7 @@
 ##### Multi-hop Forwarding (MHF)
 
 MHF is a simple, unreliable, datagram protocol.  The MHF header is
-specified below.  All fields are in network byte order (i.e., lower
-numbered bits are more significant than higher numbered bits).
+specified below.
 
      0                   1                   2                   3
      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1

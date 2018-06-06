@@ -201,3 +201,19 @@ The layers of the uCIFI stack described below.
 +-------+------------------------------------------------------------+
 | PHY   | 802.15.4-esque.                                            |
 +-------+------------------------------------------------------------+
+
+####### Conventions
+
+Whenever an octet represents a numeric quantity, the left most bit in
+the diagram is the most significant bit.  For example, the following
+diagram represents the value 170 (decimal).
+
+
+                      0 1 2 3 4 5 6 7
+                     +-+-+-+-+-+-+-+-+
+                     |1 0 1 0 1 0 1 0|
+                     +-+-+-+-+-+-+-+-+
+
+Similarly, whenever a multi-octet field represents a numeric quantity,
+the left most bit of the whole field is the most significant bit.  That
+is, all numbers are encoded using network byte order.
