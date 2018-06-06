@@ -101,8 +101,6 @@ An entry in this table has the following fields:
 +---------------+---------------------------------------------------+
 | Prev. hop     | EUI of destination's neighbor.                    |
 +---------------+---------------------------------------------------+
-| Hop count     | Number of hops to destination.                    |
-+---------------+---------------------------------------------------+
 
 Example:
 
@@ -115,24 +113,24 @@ Example:
 If `[@]` has downstream routes to each of the nodes, its downstream
 routing table might look like this:
 
-| DESTINATION   | PREV-HOP  | HOP-COUNT |
-+===============+===========+===========+
-| [1]           | N/A       | 1         |
-+---------------+-----------+-----------+
-| [2]           | N/A       | 1         |
-+---------------+-----------+-----------+
-| [3]           | [2]       | 2         |
-+---------------+-----------+-----------+
-| [4]           | [3]       | 3         |
-+---------------+-----------+-----------+
-| [5]           | [3]       | 3         |
-+---------------+-----------+-----------+
+| DESTINATION   | PREV-HOP  |
++===============+===========+
+| [1]           | N/A       |
++---------------+-----------+
+| [2]           | N/A       |
++---------------+-----------+
+| [3]           | [2]       |
++---------------+-----------+
+| [4]           | [3]       |
++---------------+-----------+
+| [5]           | [3]       |
++---------------+-----------+
 
 To send a packet to a downstream node, a device performs a sequence of
 route lookups.  Starting with the destination node, the gateway
 backtracks to the start of the route, using the last result's
 `Prev-Hop` value as input for the next lookup.  When an entry with a
-`Hop-Count` of 1 is found, the full route has been extracted from the
+`Prev-Hop` of N/A is found, the full route has been extracted from the
 table.
 
 If `[@]` wants to send a packet to `[4]`, it would perform a sequence
@@ -145,8 +143,7 @@ of three route lookups:
 Using the results of these lookups, the MHF would send the MHF packet
 with the following arguments:
 
-    Destination: [4]
-    Source route: [2], [3], [4]
+    Source route: [@], [2], [3], [4]
     MAC destination: [2]
 
 ##### Network Resolution
