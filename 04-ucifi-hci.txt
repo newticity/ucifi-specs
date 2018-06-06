@@ -242,6 +242,48 @@ outgoing data packets.
 |               | network.                                           |
 +---------------+----------------------------------------------------+
 
+### NETWORK-MEMBERSHIP-ADD (0x0005)
+
+# Command payload
+
+    0
+    0 1 2 3 4 5 6 7
+   +-+-+-+-+-+-+-+-+
+   |  Network ID   |
+   +-+-+-+-+-+-+-+-+
+
+# Response payload: None
+
+# Command description
+
+The `network-membership-add` command instructs the controller to accept
+route advertisements for the specified network.
+
+The controller responds affirmatively to this command if it
+successfully adds the network ID to its membership list, or if it was
+already a member of the network.
+
+### NETWORK-MEMBERSHIP-REMOVE (0x0005)
+
+# Command payload
+
+    0
+    0 1 2 3 4 5 6 7
+   +-+-+-+-+-+-+-+-+
+   |  Network ID   |
+   +-+-+-+-+-+-+-+-+
+
+# Response payload: None
+
+# Command description
+
+The `network-membership-remove` command instructs the controller to discard
+route advertisements for the specified network.
+
+The controller responds affirmatively to this command if it successfully
+removes the network ID from its membership list, or if it was not already a
+member of the network.
+
 ##### Controller-to-host commands
 
 ### RESPONSE (0x4001)
@@ -298,7 +340,24 @@ empty.
 | payload       | acknowledged command.                              |
 +---------------+----------------------------------------------------+
 
-### REGISTRATION-COMPLETE (0x4002)
+### FATAL-ERROR (0x4002)
+
+# Command payload
+
+    0
+    0 1 2 3 4 5 6 7
+   +-+-+-+-+-+-+-+-+
+   |    Reason     |
+   +-+-+-+-+-+-+-+-+
+
+# Command description
+
+The controller sends a `fatal-error` command to the host when it
+encounters an error that prevents it from continuing normal operation.
+Upon receiving a `fatal-error` command, the host must reset the
+controller with a `reset` command.
+
+### REGISTRATION-COMPLETE (0x4003)
 
 # Command payload
 
@@ -344,7 +403,7 @@ receiving this command, the host must do all of the following:
 | Network ID    | The ID of the affected network.                    |
 +---------------+----------------------------------------------------+
 
-### SET-PRIMARY-GATEWAY (0x4003)
+### SET-PRIMARY-GATEWAY (0x4004)
 
 # Command payload
 
@@ -386,8 +445,8 @@ source IPv6 address to use.
     |                            Gateway                            |
     |                              EUI                              |
     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    |  Network ID   | 
-    +-+-+-+-+-+-+-+-+
+    |  Network ID   |    Reason     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 # Command description
 
@@ -405,4 +464,8 @@ an interface, the host also deletes the corresponding interface.
 | FIELD         | DESCRIPTION                                        |
 +===============+====================================================+
 | Gateway EUI   | The EUI of the deleted gateway.                    |
++---------------+----------------------------------------------------+
+| Network ID    | The network that the gateway belongs to.           |
++---------------+----------------------------------------------------+
+| Reason        | The reason the gateway was deleted (codes TBD)     |
 +---------------+----------------------------------------------------+
