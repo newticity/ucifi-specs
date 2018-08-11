@@ -1,0 +1,472 @@
+####### INTRODUCTION
+
+The UCIFI MAC is a frequency hopping random access MAC.  
+
+When idlel, each node "hops" (change channels and receive or listen for packets for a predetermined length o time) over a predetermined set of channels in a pseudo-random order.  Each UCIFI node has a unique receive hop seuqence.  A node wishing to transmit to a peer, calculates the peer node's channel at the time of the transmission and "targets" the node on the correct channel. 
+
+A simple data link provides acknowledgement. If no acknowledgement is received for a frame, the peer "backs off" with a random delay and tries again, repeating the targeting above and computing a new time and channel.
+
+Local broadcast is done through beaconing.  Each node has a beacon transmit schedule which sets the time and channel for each beacon transmission.  Nodes that wish to listen to a local broadcast from a node will stop their receiveo hopping peration and tune to the brodcaster at the appropriate time and channel.
+
+Nodes discovery each others hop information and beacon information through a simple discovery mechanism descibed below in MLME.
+
+##### MAC Frame Format
+
+This section describes the UCIFI MAC frame formats.  MAC frames contain a header and IES (Information Elements). 
+
+### Basic Frame
+
+The UCIFI MAC frame format is a restricted version of the 802.15.4 2015 frame format. The UCIFI MAC uses the 802.15.4 2015 Multipurpose frame shown in the figure below.  The top row shows the length of the field in octets.
+
++-------+-----+-----+-----+-----+-----+-------------------+----------+-----+
+|  1/2  | 0/1 | 0/2 | 0/8 | 0/8 | var |    variable       | variable | 2/4 |
++-------+-----+-----+-----+-----+-----+-------------------+----------+-----+
+| Frame | Seq | Dst | Dst | Src | Sec |         IES       | Payload  | FCS |
+| Ctrl  | Num | PAN | Adr | Adr | Hdr +---------+---------|          |     |
+|       |     |     |     |     |     | hdr IEs | pay IEs |          |     |
++-------+-----+-----+-----+-----+-----+---------+---------+----------+-----+
+|                    MHR                        |  MAC Payload       | MFR |
++-------+-----+-----+-----+-----+-----+---------+---------+----------+-----+
+
+where the frame control field has the format shown below with the first row indicating the bit position and count:
+
++------+------+------+------+------+------+------+------+------+------+------+
+| 0-2  | 3    | 4-5  | 6-7  |  8   |  9   |  10  |  11  | 12-13|  14  | 15   |
++------+------+------+------+------+------+------+------+------+------+------+
+| Frame| Long | Dst  | Src  | PAN  | Sec  | Seq  | Frame| Frame| Ack  | IE   |
+| Type | Frame| Addr | Addr |  ID  | Ena  | Num  | Pend | Ver  | Req  | Pres |
+|      | Ctrl | Mode | Mode | Pres |      | Supr |      |      |      |      |
++------+------+------+------+------+------+------+------+------+------+------+
+
+When transmitting broadcast or beacon frames, the sending device shall:
+* set the DAM to 0b00
+* set the PANID present bit to 0b1
+* set the SAM to 0b11
+* Set the Sequence number suppression field to 0b1.
+* Set the Frame pending field to 0b0
+* Set the AR field to 0b0
+* set the IE present field to 0b1
+* Set the Long Frame Control to 0b1
+* Set the Frame type to 0b101
+* Set the Frame Version field to 0b00
+* Set The Security Enable bit depending on the security settings of the PAN
+* Payload is not used.  All Data is encoded in IEs
+
+When transmitting unicast frames, the sending device shall:
+* set the DAM to 0b11
+* set the PANID present bit to 0b0
+* set the SAM to 0b11
+* Set the Sequence number suppression field to 0b0.
+* set the IE present field to 0b1
+* Set the Long Frame Control to 0b1
+* Set the Frame type to 0b101
+* Set the Frame Version field to 0b00
+* Set The Security Enable bit depending on the security settings of the PAN
+* Set AR and FR depending on the unicast transmissions requirements
+* Payload is not used.  All Data is encoded in IEs
+
+All bit and field ordering follows the 802.15.4 standard.
+
+# UCIFI Header IEs
+
+The following 15.4 header IEs will be used in UCIFI.  
+* UCIFI Header IE 0x2c
+* Header Termination 1
+* Header Termination 2
+
+NOTE: There is a time correction IE that is available in 15.4 that we could use to patch our packet times up to 2 msec, but that is probably not long enough. Plus its not really intended for that. Its more intended for advertising correction of time to others.
+
+The figure below shows the 15.4 IE header format:
+
++-----------+------------+--------+---------------+
+| Bits: 0-6 |   7-14     |  15    | Octents 0-127 |
++-----------+------------+--------+---------------+
+| Length    | Element ID | Type=0 | Content       |
++-----------+------------+--------+---------------+
+
+See UCIFI Information Elements for a description of the specific elements defined by UCIFI.
+
+# UCIFI Payload IEs:
+
+The following 15.4 payload IEs will be used in UCIFI
+* 802.15.9 Multiprotocol IE (MPIE). (group ID 0x03)
+
+The payload IE format from 15.4 is shown below:
++--------------+----------+--------+
+| bits 0-10    |bits 11-14| bit 15 |
+| Length       |group   ID| type=1 |
++--------------+----------+--------+
+
+# UCIFI Upper Layer Data:
+
+Upper layer data will be stored in the MPIE from 802.15.9 to allow for fragmentation of frames at the MAC and to allow for multiplexing of several protocols on top of the MAC.
+
+In the first version of UCIFI, the following will be supported:
+* Transfer type 0b00
+
+NOTE: I don't propose that we use the format 15.9 SAP definitions or anything like that.  I just want to use the packet format for upper layer fragmentation and use the dispatch for sending to multiple upper layer protocols.
+15.9 reserves values 1280-1500 for vendor specific dispatches.  Until UCIFI gets a format range of numbers for its upper layer protocols, the following numbers will be used.
+
++------------------------------+----------------+-----------------------------+
+| Name                         | Multiplex ID   |        Description          |
+|UCIFI Layer 2 Routing Protocol|     1400       |  MHF payloads enclosed      |
+|UCIFI Layer 2 Ping            |     1401       | a echo req/reply protocol   |
+|UCIFI Layer 2 MLME            |     1402       | MAC mgmt proto for UCIFI    |
++------------------------------+----------------+-----------------------------+
+
+Notes:
+* A may contain Header IEs and MPX IEs.
+* A UCIFI MAC frame many contain multiple MPX IEs.
+
+If we look at the total MAC overhead for a unicast routing frame we have.
+* 2 octet FCTL
+* 16 octets address (src and dst)
+* 4 octet CRC
+* 1 octet Sequence number (dup suppression)
+* 5 octet TIMING_OFFSET
+* 5 octet MPX IE
+* for a total of 31 octets.
+
+##### Information Elements
+
+UCIFI sends all MAC information and payload as IEs. Specifics are shown below.
+
+### Header Information Elements
+
+UCIFI alliance will get a special header IE identifier from 802.15.4 to use for its header IE elements.  Until that number is assigned by standard, UCIFI will use the  element 0x2c. UCIFI defines a space of Header sub-IEs with the UCIFI Header IE space as shown below
+
++----------------------------+----------------+
+|      2 octet               |   1 octet      |
+|  15.4 header IE type=0x2c  |  UCIFI SUBTYPE |
++----------------------------+----------------+
+
+The following UCIFI header subtypes are defined:
++----------------------------+----------------+
+| Name                       |      ID        |
+| TIME_OFFSET                |      0x01      |
+| UNICAST_FRACTIONAL_EPOCH   |      0x02      |
+| RSSI                       |      0x03      |
++----------------------------+----------------+
+
+# UNICAST_FRACTIONAL_EPOCH (UFE)
++----------------------------+
+|      4 octet               |
+|Unicast Fractional Epoch    |
+|         unitless           |
++----------------------------+
+
+This element communicates the time that a packet was sent/generated via describing exactly where the in our unicast epoch the device was when it generated the packet.
+
+Its a fractional representation of the portion of the epoch that has elapsed where 0 represents 0 and 0xffffffff represents 1.0 - 1/2^32 from the end of the epoch.  The parameter is unitless but can be converted into a time by multiplying by the epoch time in whatever units you are using and then dividing by 2^32.
+
+See UCIFI Hop Sequences for generation and treatment of the UFE element.
+
+# TIME_OFFSET (TO)
++----------------------------+
+|      2 octet               |
+|       time offset          |
+| 1 MSB = 10 usec            |
++----------------------------+
+
+This is the time offset from the generation of any packet timestamps above the MAC.  (TBD does this include the UFE).  Its used by receiving nodes to accurately interpret timestamps in the packet. See UCIFI Hop Sequences for generation and treatment of the TIME_OFFSET element.
+
+# RSSI
++----------------+
+|  1 octet       |
+|  rssi          |
+|  dBm + 174     |
++----------------+
+The rss IE contains the receive single strength of the previously received packet in the data link.  RSSI is an unsigned 8-bit value that is adjust by 174 dB to create a signed number with greater range. (e.g a value of 0 represents -174 dBm, 1 represents -173 dam, 174 represents 0 dBm...)
+
+##### Hop Sequences
+
+A UCIFI hope sequence has  65536 slots numbered 0-65535. the set of 65536 slots is called an epoch.
+
+Each slot is the same duration and is reported in the nodes discovery information.
+
+A 16 bit slot counter keeps track of the nodes current slot. Where a node starts in its current_slot can be set arbitrarily.
+
+When a node reaches the end of a slot it:
+* disables its receiver
+* increments its slot counter
+* computes the channel for the new slot
+* change channels
+* enables reception on the channel corresponding to the next slot
+
+A nodes shall schedule its timing such that it performs this operation at the very beginning of the new slot.  Since it take a finite amount of time for this preparation, the node may not be actively listening on this slot until a complete turn around time after the start of the slot.
+
+When a node complete slot 65535, incrementing its slot counter wraps it to 0.
+UCIFI generates the slot to channel mapping using a jenkins hash. The jenkins hash function uses jenkins_on_at_a_time_hash.c seen on https://en.wikipedia.org/wiki/Jenkins_hash_function#cite_note-11.
+
+The hash input is the following data concatenated into an array of octets called the key.
+* a 16-bit slot number from 0-65535 in little endian format.
+* an 8 byte MAC address of the node in little endian format (OUI first).
+*
+The 32-bit hash output is taken modulo num_channels to derive proper receive channel for that slot.
+
+##### UCIFI Timing
+
+UCIFI nodes report their epoch timing in a UCIFI_FRACTIONAL_EPOCH IE (UFE)
+The IE contains a 32-bit value which is the fractional location if the node within its epoch at the generation of the transmit of the frame in which the IE is contained.  
+
+Since the epoch is always 65536 slots, the most significant two octets of the 32-bit fractional location are the slot number 0-65535.  The least significant two octets of the fractional location are the position within the slot.
+* 0 corresponds to the very beginning of the slot.
+* 65535 correspond to 1/65536 of a slot away from the beginning of the next slot.
+
+Since a delay often exists between frame generation and transmission, a packet may contain a TIME_OFFSET element.  The TIME_OFFSET element is the offset in 10 usec increments between the generation and the transmission of the frame.  This from the computation above you will need to correct for the transmissions delays as follows.
+* Convert the timing offset from 10 usec increments to fractional slot increments using the nodes slot duration.
+* Add this value to the 32-bit fractional location
+* Perform the calculations above to determine slot and fractional slot.
+
+##### Data Link
+
+The UCIFI Data link utilizes the 15.4 Multi-purpose frame. 
+CCA and CSMA are not required for UCIFI devices.
+
+When sending a unicast frame to a peer:
+
+* UFICI device shall send the frame on the recipients hop sequence.  
+* The preamble and start word of the frame must be received fully within a single recipients slot.
+* Care must be taken on transmit to account for clock drift, timing accuracy and propagation delays when calculating the time to transmit a unicast frame.
+
+A UCIFI compliant node receiving a packet with AR=1 shall send an response frame (TBD) on the same channel.
+* The first bit of the response packet shall transmitted at a delay from the last bit of the previous packet containing AR=1
+* The delay is the larger of the devices turn around time and the peers' turn around time.
+* If no peer turn around time is available, a nominal 1 msec shall be used 
+After transmission of the frame the node may return to their unicast hop sequence
+* The response frame must contain a RSSI IE.
+
+A UCIFI compliant node receiving a packet with FP=1 should stay on the same channel for a duration awaiting an additional packet.
+* The wait duration must be the larger of the nodes turn around time and the peer nodes turn around time plus the time it takes the receiver to detect the presence of a packet.
+* After the duration, if no packet is received, the node may return to their unicast hop sequence.
+
+A UCIFI compliant node receiving a packet with both FP=1 and AR=1 shall follow the rules for AR=1 and then FP=1.
+
+A UCIFI compliant device sending an unicast frame with AR=1 must should wait for an acknowledgement for a duration
+* The wait duration must be the larger of the devices turn around time and the peer nodes turn around time plus the time it takes the receiver to detect the presence of a packet.
+* After the duration, if no packet is received, the node may return to their unicast hop sequence.
+* If the acknowledgement is received, the node may return to their unicast hop sequence.
+
+### Two typical UCIFI Unicast Transactions
+
+For small unicast packets the sending UCIFI node can send the packet with the AR=1 and await the ack.
+
+For medium and large unicast packets its recommended the UFICI node follow this procedure
+* Send an empty frame with the AR=1 FP=1 to ensure the receiver is listening
+* Await the response from the receiver.
+* When the response is received, send the data frame with AR=1
+* Await the response from the receiver.
+
+NOTE: This transfer mechanism means that its possible you may be sending a frame to a peer AR=1 and the peer sends you a frame with AR=1 (duplex data). For now, we don't handle this in UCIFI so the rule above about FP and AR can be further reduced to
+* Only the initiator of the link can se the AR and FR bits. The initiator is the one who's is not hopping on its unicast hop sequence.
+
+### Backoff
+
+When an acknowledged unicast packet is attempted to a node and no acknowledgement is received the device must "back-off" the peer node. When a peer node is "backed-off" it will not transmit any frames to that node. But it can transmit frames to other nodes.
+Backoff calculations are as follows:
+On the first failures, the window is set to "UCIFI_BASE_BACK_OFF
+On subsequent failures the window is set to the old window value * 2
+if the window value exceeds UCIFI_MAX_BACK_OFF the window is truncated at UCIFI_MAX_BACK_OFF 
+A random value from the interval [window/2, window] is selected
+The peer is backed-off for this value.
+
+
+##### Beacons
+
+UCIFI nodes will generate beacons and listen to beacons from their peers:
+ * a UCIFI node will attempt to listen to all assured beacons from a relevant peer
+ * a UCIFI node will generate assured beacons according to its advertised schedule
+ 
+Beacons serve the following purposes:
+ * To provide a source for hop timing information for a device to share with neighbors
+ * To provide a conduit for upper layer broadcast data
+
+Each beacon stream is configured with two parameters.
+ * Beacon Interval in Seconds – the interval between transmissions of beacons in the stream.
+ * Beacon start Offset in Seconds – the offset from MAC start for the first beacon in the sequence.
+
+### Beacon Channel Hopping
+
+The beacon channel is calculated from the same hash functions as the unicast hop sequence using the beacon_slot state rather than the unicast slot. After each beacon transmissions, the last_beacon_slot is incremented.  last_beacon_slot is a 16-bit counter that wraps and restart the beacon hop sequence.  A beacon epoch is 65536*beacon_interval_sec seconds long.
+
+### Beacon Types
+
+The UCIFI MAC has two beacon stream types: assured and opportunistic:  
+
+Assured beacons are always sent by the MAC at their configured beacon interval regardless of whether there is upper layer data to deliver or not.  This ensures that the MAC is always sending periodic timing data to peers.
+
+Opportunistic beacons are sent by the MAC only when one or more upper layer protocols provide data to send.
+
+### Beacon Frames
+
+Beacon Frames have the following requirements:
+* Must have the frame format specified in UCIFI MAC Frame Formats for broadcast frames
+* Must include the following IEs:
+    * UNICAST_FRACTIONAL_EPOCH
+* May include other IEs or MPX IEs carrying user data
+
+### Beacon Sending Behavior
+
+The following describes the beacon sending behavior:
+
+* Upon start the UCIFI MAC will use it configured start offset and schedule a time in advance of that start offset to build the beacon
+* At the build beacon time, the UCIFI MAC will construct a MAC frame with the UCIFI_UNICAST_TIMING IE. the UCIFI MAC will then call the upper layers that have bound a function to this beacon and for each one
+   * Save space for the MPIE header for this device in a mbuf
+   * Call the function and let the upper layer insert octets
+   * Use the returned length to build the MPIE header
+* Upon completion the UCIFI MAC will schedule the time for the actual beacon transmission.
+   * For opportunistic beacons if there is no data to send the transmissions does not occur
+* The UCIFI MAC will update the last_beacon_slot and last_beacon_unicast_timing 
+* if two beacons require transmit at the same time, the assured beacon has priority and the opportunistic beacon is skipped.
+
+### Beacon Receiving Behavior
+
+The following describes the MAC beacon receiving behavior:
+
+* The MAC (through the MAC API) can be instructed to subscribe or unsubscribe from receiving a peers beacons
+* The MAC create a list of beacon receivers that are subscribed ordered by expiration time
+* The MAC checks if a beacon will be receive soon and resolves conflict based on prioroity
+* The MAC set the phy to receive on the proper channel and time to receive the beacon
+A priority in the subscription determines what to do if multiple receives are occurring too close together
+* The beacon travels up the normal MAC packet processing path
+
+##### MLME
+
+UCIFI MLME is a protocol running above the MAC to discovery peer nodes and exchange information.
+
+MLME communicates using 15.4 style IEs.  
+
+NOTE: These IEs are not in the 15.4 namespace since they exist only inside the MPIE for MLME.  
+
+MLME frames contain one or more MLME IEs as shown below.
+
+### MLME  IEs
+
+UCIFI alliance will get a special nested sub-ID IE identifier from 802.15.4 to use for its nested sub-IE elements.  Until that number is assigned by standard, UCIFI will use the reserved element 0x2c for its MLME traffic.
+
++----------------------------+----------------+
+|      2 octet               |   1 octet      |
+|15.4 nested subIE type=0x2c |  UCIFI SUBTYPE |
++----------------------------+----------------+
+
++-----------------------------+----------------+
+| Name                        |      ID        |
+| UCIFI_UNICAST_SCHEDULE_INFO |     0x00       |
+| UCIFI_BEACON_INFO           |     0x01       |
+| UCIFI_DEVICE_INSTANCE       |     0x02       |
+| UCIFI_NETWORK_NAME          |     0x03       |
+| UCFI_PHY_PARAMS             |     0x04       |
++-----------------------------+----------------+
+
+# UCIFI_UNICAST_SCHEDULE
+
++-------------------+
+|     2 octet       |
+|  dwell interval   |
+|   milliseconds    |
++-------------------+
+
+With the following field:
+* Dwell Interval – the time the radio spends on each slot.  An epoch is always 65536 * dwell_interval.
+
+# UCIFI_BEACON_INFO
+
++--------------------------+-------------------+------------------------------+
+| 2 bits |    14 bits      | 2 octet           |         4 octet              |
+| Type   | beacon interval | last beacon slot  |   our UFE at last beacon TX  |
+|        |  seconds        |  ppm              |         unitless             |
++--------------------------+-------------------+------------------------------+
+
+With the following fields:
+* Type - The type of beacon
+    0 = slow
+    1 =fast
+    2-3 reserved
+* Beacon Interval Seconds – the number of seconds between beacon transmits
+* Last Beacon Slot-- the slot number corresponding to the last beacon transmitted by the node
+* Last_beacon_UFE – our UFE corresponding to the last beacon transmitted by the node
+ 
+# UCIFI_DEVICE_INSTANCE
+
++-------------------+
+| 1 octet           |
+| Instance ID       |
+|  unitless         |
++-------------------+
+With the following fields:
+* Instance ID: A 8-bit counter value that the device uses to signify that its timing or parameters have changed.  Whenever a devices changes anything that affects its unicast or beacon timing, this value should increment.  Devices should persist this value so that power cycles trigger incrementing of this value.
+
+# UCIFI_NETWORK_NAME
+
++-----------------------------------+
+| variable up to 32 octets          |
+| Network Name                      |
+|  unitless                         |
++-----------------------------------+
+
+With the following fields:
+* Network_name a variable length byte array describing the network name to which this node belongs or is searching for.  This value can contain arbitrary octets, but when used as a string it should NOT contain NULL characters.
+
+# UCFI_PHY_PARAMS
+
++-------------------+-------------+--------------+
+|     1 octet       | 1 octet     | 1 octet      |
+| turn around       | clock drift | timing acc   |
+| 1 MSB = 10 usec   |  ppm        | 10*usec      |
++-------------------+-------------+--------------+
+
+With the following fields:
+* Turn Around – the devices worst case turn around for TX/RX and RX/TX.  
+* Clock Drift – The worst case drift of the nodes clock in ppm
+* Timing Accuracy – The worst case accuracy of the devices timestamps and transmissions attempts.
+
+### Discovery:
+
+A UCIFI device will have a discovery mode where it actively tries to discovery a network
+A discovering UCIFI device will send discovery messages randomly at predetermined rate across all channels. These message are insecure. 
+
+A discoverable UCIFI device will respond to discovery messages in the following manner
+* If one or more of the desired network match the nodes current operating network
+* And the node determines it has not answered this node in its current instance. 
+    * Blacklist are acceptable to ignore known devices to fail security, but should allow revalidation at least once every hour.
+* The node will send a UCIFI discovery response to the node by unicast.
+
+### Security
+When security is enabled, the joining node will then complete a secure association with the peer and establish peer keys for secure peer wise communications.
+
+Security mechanism is TBD. Not sure how beacons are secured.  I assume there is a group key somewhere for this that comes out of the negotiation
+
+### Frame Contents
+
+A UCIFI Discovery frame must contain the following IEs.
+* UCIFI_UNICAST_SCHEDULE_INFO
+* UCIFO_BEACON_INFO (at least one)
+* UCIFI_DEVICE_INSTANCE
+* UCIFI_NETWORK_NAME (at least one)
+* UCIFI_PHY_PARAMS 
+* UNICAST_FRACTIONAL_EPOCH
+* 
+A UCIFI Discovery response frame must contain the following IEs.
+* UCIFI_UNICAST_SCHEDULE_INFO
+* UCIFO_BEACON_INFO (at least one)
+* UCIFI_DEVICE_INSTANCE
+* UCIFI_NETWORK_NAME 
+* UCIFI_PHY_PARAMS 
+* UNICAST_FRACTIONAL_EPOCH
+*
+
+### Operation
+
+Once secure, the device will advertise a new to its upper routing layer to begin joining the routing mesh.
+
+TODO: Do we want to allow all nodes to be discoverable. This is how other meshes work sometimes allowing peer links to be established before there is any backhaul etc.  However, networks like wisun don't really allow a node to be "discoverable" until it becomes a trusted member of the mesh. There is obviously a trade-off here between time to build the mesh. 
+
+### Maintenance
+
+The UCIFI mlme will perform the following maintenance operations.
+The UFICI node will listen to assured beacons from relevant peer nodes
+The UCIFI node will maintain the timing information suitable to target peer nodes
+
+TODO – we obviously need a way to prune symmetrically.   This is going to take more work and won't be done soon
+
+ 
