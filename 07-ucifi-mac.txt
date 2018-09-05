@@ -116,7 +116,7 @@ NOTE: I don't propose that we use the format 15.9 SAP definitions or anything li
 
 Notes:
 * A may contain Header IEs and MPX IEs.
-* A UCIFI MAC frame many contain multiple MPX IEs.
+* A UCIFI MAC frame may contain multiple MPX IEs.
 
 If we look at the total MAC overhead for a unicast routing frame we have.
 * 2 octet FCTL
@@ -270,7 +270,6 @@ if the window value exceeds UCIFI_MAX_BACK_OFF the window is truncated at UCIFI_
 A random value from the interval [window/2, window] is selected
 The peer is backed-off for this value.
 
-
 ##### Beacons
 
 UCIFI nodes will generate beacons and listen to beacons from their peers:
@@ -301,7 +300,7 @@ Opportunistic beacons are sent by the MAC only when one or more upper layer prot
 
 Beacon Frames have the following requirements:
 * Must have the frame format specified in UCIFI MAC Frame Formats for broadcast frames
-* Must include the following IEs:
+* Must include the following MAC IEs:
     * UNICAST_FRACTIONAL_EPOCH
 * May include other IEs or MPX IEs carrying user data
 
@@ -356,6 +355,7 @@ UCIFI alliance will get a special nested sub-ID IE identifier from 802.15.4 to u
 | UCIFI_DEVICE_INSTANCE       |     0x02       |
 | UCIFI_NETWORK_NAME          |     0x03       |
 | UCFI_PHY_PARAMS             |     0x04       |
+| UCFI_FRAME_TYPE             |     0x05       |
 +-----------------------------+----------------+
 
 # UCIFI_UNICAST_SCHEDULE
@@ -389,12 +389,12 @@ With the following fields:
 # UCIFI_DEVICE_INSTANCE
 
 +-------------------+
-| 1 octet           |
+| 2 octet           |
 | Instance ID       |
 |  unitless         |
 +-------------------+
 With the following fields:
-* Instance ID: A 8-bit counter value that the device uses to signify that its timing or parameters have changed.  Whenever a devices changes anything that affects its unicast or beacon timing, this value should increment.  Devices should persist this value so that power cycles trigger incrementing of this value.
+* Instance ID: A 16-bit counter value that the device uses to signify that its timing or parameters have changed.  Whenever a devices changes anything that affects its unicast or beacon timing, this value should increment.  Devices should persist this value so that power cycles trigger incrementing of this value.
 
 # UCIFI_NETWORK_NAME
 
@@ -420,40 +420,55 @@ With the following fields:
 * Clock Drift – The worst case drift of the nodes clock in ppm
 * Timing Accuracy – The worst case accuracy of the devices timestamps and transmissions attempts.
 
+# UCIFI_FRAME_TYPE
+
+All MLME frames carry the UCIFI MLME frametype IE.  This is used by the receiver to direct the processing 
+of received frames
+
++-------------------+
+| 1 octet           |
+| MLME Frame Type   |
+|  unitless         |
++-------------------+
+
++-----------------------------+----------------+
+| Name                        |      ID        |
+| FRAME_TYPE_DISCOVERY        |     0x00       |
+| FRAME_TYPE_ASSURED_BEACON   |     0x01       |
+| FRAME_TYPE_OPPORTUE_BEACON  |     0x02       |
++-----------------------------+----------------+
+
 ### Discovery:
 
 A UCIFI device will have a discovery mode where it actively tries to discovery a network
 A discovering UCIFI device will send discovery messages randomly at predetermined rate across all channels. These message are insecure. 
 
-A discoverable UCIFI device will respond to discovery messages in the following manner
+A discoverable UCIFI device will respond to discovery messages with directed discovery message in the following manner
 * If one or more of the desired network match the nodes current operating network
 * And the node determines it has not answered this node in its current instance. 
     * Blacklist are acceptable to ignore known devices to fail security, but should allow revalidation at least once every hour.
-* The node will send a UCIFI discovery response to the node by unicast.
+* The node will send a UCIFI directed discovery message to the node by unicast.
 
 ### Security
 When security is enabled, the joining node will then complete a secure association with the peer and establish peer keys for secure peer wise communications.
 
 Security mechanism is TBD. Not sure how beacons are secured.  I assume there is a group key somewhere for this that comes out of the negotiation
 
-### Frame Contents
+### MLME Frame Contents
 
-A UCIFI Discovery frame must contain the following IEs.
+All MLME frame must contain the following MAC IEs:
+* UNICAST_FRACTIONAL_EPOCH
+
+A UCIFI Discovery frame must contain the following MLME IEs:
+* UCIFI_FRAME_TYPE =  FRAME_TYPE_DISCOVERY
 * UCIFI_UNICAST_SCHEDULE_INFO
 * UCIFO_BEACON_INFO (at least one)
 * UCIFI_DEVICE_INSTANCE
 * UCIFI_NETWORK_NAME (at least one)
 * UCIFI_PHY_PARAMS 
-* UNICAST_FRACTIONAL_EPOCH
-* 
-A UCIFI Discovery response frame must contain the following IEs.
-* UCIFI_UNICAST_SCHEDULE_INFO
-* UCIFO_BEACON_INFO (at least one)
-* UCIFI_DEVICE_INSTANCE
-* UCIFI_NETWORK_NAME 
-* UCIFI_PHY_PARAMS 
-* UNICAST_FRACTIONAL_EPOCH
-*
+
+A UCIFI Beacon frame must contain the following MLME IEs:
+* UCIFI_FRAME_TYPE =  FRAME_TYPE_ASSURED_BEACON or FRAME_TYPE_OPPORTUNE_BEACON
 
 ### Operation
 
