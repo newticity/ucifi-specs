@@ -222,8 +222,6 @@ create a signed number with greater range. (e.g a value of 0 represents -174 dBm
 
 ##### Hop Sequences
 
-
-
 A UCIFI hope sequence has  65536 slots numbered 0-65535. the set of 65536 slots 
 is called an epoch.
 
@@ -569,7 +567,7 @@ rate across all channels. These message are insecure.
 
 A discoverable UCIFI device will respond to discovery messages with directed 
 discovery message in the following manner
-* If one or more of the desired network match the nodes current operating network
+* If the desired network match the nodes current operating network
 * And the node determines it has not answered this node in its current instance. 
     * Blacklist are acceptable to ignore known devices to fail security, but 
       should allow revalidation at least once every hour.
@@ -593,7 +591,7 @@ A UCIFI Discovery frame must contain the following MLME IEs:
 * UCIFI_UNICAST_SCHEDULE_INFO
 * UCIFO_BEACON_INFO (at least one)
 * UCIFI_DEVICE_INSTANCE
-* UCIFI_NETWORK_NAME (at least one)
+* UCIFI_NETWORK_NAME
 * UCIFI_PHY_PARAMS 
 
 A UCIFI Beacon frame must contain the following MLME IEs:
