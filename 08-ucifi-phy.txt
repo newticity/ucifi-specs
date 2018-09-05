@@ -1,4 +1,4 @@
-######## Introduction
+## Introduction
 
 The UCIFI PHY requires the 802.15.4g SUN FSK PHY.
 header format for the SUN PHY is shown below
@@ -7,13 +7,13 @@ header format for the SUN PHY is shown below
 |     SHR    |    PHR     |   PHY Payload     |
 +------------+------------+-------------------+
 
-##### SHR
+### SHR
 
 UCIFI SUN PHY SHR has the following restrictions from 15.4.g 2015
 * The UCIFI PHY uses 2-FSK
 * The UCIFI PHY uses phySunFskSfd=0 and uncoded transmission/reception
 
-##### PHR
+### PHR
 UCIFI SUN PHY PHR has the following restrictions from 15.4.g 2015 
 
 +--------+----------+--------+--------+--------+
@@ -26,9 +26,12 @@ UCIFI SUN PHY PHR has the following restrictions from 15.4.g 2015
 * Mode Switch shall be set to zero
 * FCS Type shall be set to 4 octet
 * Data Whitening shall be set to 1
-* Modulation and Channel Plan
 
-UCIFI SUN PHY modulation and channel plan has the following restrictions from 15.4.g 2015. It shall use only the following combinations.
+
+### Modulation and Channel Plan
+
+UCIFI SUN PHY modulation and channel plan has the following restrictions from 
+15.4.g 2015. It shall use only the following combinations.
 
 +-----------+-----------+------------+------------+------------+
 |           | Data Rate |    50 kbps |   150 kbps |   200 kbps |
